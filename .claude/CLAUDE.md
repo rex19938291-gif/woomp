@@ -82,6 +82,10 @@ ECPay（綠界）閘道基底 `RY_ECPay_Gateway_Base` 已實作後台退款（`s
 
 **綠界回應不可用 `parse_str()` 解析**：`QueryTradeInfo/V5` 回應的值完全不做 URL encode（中文、空白、字面 `+` 皆為原文），而 CheckMacValue 是用這些原始值簽的。`parse_str()` 會把字面 `+` 解成空白、把 `%xx` 解碼、把 key 的 `.`／空白換成 `_`，導致重算的驗章必定失敗（品名含 `+` 的訂單退款 100% 失效）。一律改用 `RY_ECPay_Gateway_Api::parse_response_body()`（`explode` 且不 urldecode）。測試中的綠界假回應同理**不可**用 `http_build_query()` 產生，否則測試全綠、正式站全滅。
 
+### 綠界電子發票明細必須加總等於 SalesAmount
+
+綠界在明細加總和 `SalesAmount` 對不上時會回 `RtnCode 1200031`。`EcpayInvoiceHandler::build_invoice_items()` 的商品、運費、費用都列**含稅**金額，折扣行**不自己重算稅額**，一律用「訂單總額 − 已列出的明細」的差額（issue #137：以前用 `get_total_tax()` 算，那是折扣後的稅，而且含運費稅，只在 WC 沒開稅金時才剛好對）。多數台灣商店沒開 WC 稅金，所以稅相關的 bug 平常看不到，測試要開稅金才測得出來（`EcpayInvoiceItemsTest`）。
+
 ### 結帳驗證不可依賴動態 `required`
 
 `WC_Checkout::get_checkout_fields()` 會快取欄位，只要有其他外掛在 `woocommerce_checkout_init`（早於 `woocommerce_checkout_process`）讀過欄位，之後在 filter 裡依 `did_action('woocommerce_checkout_process')` 動態改 `required` 就不會生效；另外，沒勾「運送到不同地址」時，WC 會略過整組 shipping 欄位的驗證（issue #136）。因此：
