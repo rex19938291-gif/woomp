@@ -132,19 +132,18 @@ final class Response {
 			return;
 		}
 
-		// 對外公開的端點（return / notify）先驗 HashInfo 再解密，杜絕偽造請求。
-		// PayUni 的回傳一律帶 HashInfo；此處採「有帶才驗」而非「不帶即拒」，避免任何
-		// 既有站台因 PayUni 端行為差異而整批失效——那會比偽造更糟。
+		// 依現有協定註解，PayUni 的回傳一律帶 HashInfo；外部回傳須先驗證再解密。
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- 金流商回呼沒有 nonce，以 HashInfo 簽章取代。
-		if ( self::CONTEXT_SYNC !== $context && isset( $_REQUEST['HashInfo'] ) ) {
-			$expected_hash = Payment::hash_info( (string) $encrypt_info );
-			if ( ! \hash_equals( $expected_hash, (string) $_REQUEST['HashInfo'] ) ) {
-				// phpcs:enable WordPress.Security.NonceVerification.Recommended
-				Payment::log( "card_response[{$context}]: HashInfo 驗證失敗，拒絕處理", 'error' );
+		if ( self::CONTEXT_SYNC !== $context ) {
+			$hash_info = $_REQUEST['HashInfo'] ?? null;
+			if ( ! \is_string( $hash_info ) || '' === $hash_info
+				|| ! \hash_equals( Payment::hash_info( (string) $encrypt_info ), $hash_info ) ) {
+				Payment::log( "card_response[{$context}]: HashInfo 缺失或驗證失敗，拒絕處理", 'error' );
 				self::finish( $context, null, '' );
 				return;
 			}
 		}
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		$data = Payment::decrypt( (string) $encrypt_info );
 
