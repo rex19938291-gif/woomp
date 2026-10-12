@@ -95,117 +95,10 @@ class EcpayInvoiceHandler {
 			$ecpay_invoice->MerchantID     = $this->get_api_key()['merchant_id'];
 			$ecpay_invoice->HashKey        = $this->get_api_key()['hashkey'];
 			$ecpay_invoice->HashIV         = $this->get_api_key()['hashiv'];
-			$ecpay_invoice->Send['Items']  = [];
 
-			// 取得商品資訊
-			$items    = [];
-			$itemsTmp = $order->get_items();
-
-			// 商品資訊
-			$order_total_summed_by_items = 0;
-			foreach ( $itemsTmp as $key => $WC_Order_Item_Product ) {
-				$items[ $key ]['ItemName']    = wp_strip_all_tags( str_replace( '|', '-', $WC_Order_Item_Product->get_name() ), true ); // 商品名稱 ItemName
-				$items[ $key ]['ItemCount']   = $WC_Order_Item_Product->get_quantity(); // 數量 ItemCount
-				$items[ $key ]['ItemAmount']  = round( (float) $WC_Order_Item_Product->get_subtotal() + (float) $WC_Order_Item_Product->get_subtotal_tax(), 2 ); // 小計 ItemAmount
-				$items[ $key ]['ItemPrice']   = round( (float) $items[ $key ]['ItemAmount'] / (float) $items[ $key ]['ItemCount'], 2 ); // 單價 ItemPrice
-				$order_total_summed_by_items += (float) $items[ $key ]['ItemAmount']; // 將 items 總額加總起來
-			}
-
-			// 組合商品
-			foreach ( $items as $key => $value ) {
-				array_push(
-					$ecpay_invoice->Send['Items'],
-					[
-						'ItemName'    => str_replace( '|', '-', $value['ItemName'] ),
-						'ItemCount'   => $value['ItemCount'],
-						'ItemWord'    => '批',
-						'ItemPrice'   => round( (float) $value['ItemPrice'], 2 ),
-						'ItemTaxType' => 1,
-						'ItemAmount'  => round( (float) $value['ItemAmount'], 2 ),
-					]
-				);
-			}
-
-			// 運費
-			$shipping_total = number_format( (float) $order->get_shipping_total() + (float) $order->get_shipping_tax(), wc_get_price_decimals(), '.', '' );
-
-			if ( $shipping_total != 0 ) {
-
-				array_push(
-					$ecpay_invoice->Send['Items'],
-					[
-						'ItemName'    => '運費',
-						'ItemCount'   => 1,
-						'ItemWord'    => '式',
-						'ItemPrice'   => round( (float) $shipping_total, 2 ),
-						'ItemTaxType' => 1,
-						'ItemAmount'  => round( (float) $shipping_total, 2 ),
-					]
-				);
-			}
-
-			// 取得費用
-			$fee_amount = 0;
-			$fees       = $order->get_fees();
-			foreach ( $fees as $fee ) {
-				$fee_amount += (float) $fee->get_amount();
-			}
-			if ( $fee_amount !== 0 ) {
-				array_push(
-					$ecpay_invoice->Send['Items'],
-					[
-						'ItemName'    => '費用',
-						'ItemCount'   => 1,
-						'ItemWord'    => '式',
-						'ItemPrice'   => round( (float) $fee_amount, 2 ),
-						'ItemTaxType' => 1,
-						'ItemAmount'  => round( (float) $fee_amount, 2 ),
-					]
-				);
-			}
-
-			// 手動修改價格，既不算費用，也不算優惠券，因此需要獨立判斷
-			// 不直接用 get_total 是因為 commit c13ca42158d8d836176876c5dbda8d4bb77ba7e6
-			$diff_price        = round( $order->get_total() - $order->get_subtotal() - (float) $fee_amount - (float) $shipping_total - $order->get_total_tax(), 2 );
-			$has_manual_coupon = $diff_price < 0; // 最終價格 < 原價，表示有手動折扣
-			if ( $has_manual_coupon ) {
-				array_push(
-					$ecpay_invoice->Send['Items'],
-					[
-						'ItemName'    => '折扣',
-						'ItemCount'   => 1,
-						'ItemWord'    => '式',
-						'ItemPrice'   => $diff_price,
-						'ItemTaxType' => 1,
-						'ItemAmount'  => $diff_price,
-					]
-				);
-			}
-
-			// 折價券
-			// 因為後台改金額，不會動態產生 coupon，只能用 total, subtotal 來判斷，就不獨立判斷 coupon 了
-			// $coupons = $order->get_items('coupon');
-			// foreach ($coupons as $coupon) {
-			// $item_price = -1 * round( (float) $coupon->get_discount() + (float) $coupon->get_discount_tax(), 2 );
-			// array_push(
-			// $ecpay_invoice->Send['Items'],
-			// [
-			// 'ItemName'    => '折價券 - ' . $coupon->get_name(),
-			// 'ItemCount'   => 1,
-			// 'ItemWord'    => '式',
-			// 'ItemPrice'   => round( $item_price / $coupon->get_quantity(), 2 ),
-			// 'ItemTaxType' => 1,
-			// 'ItemAmount'  => $item_price,
-			// ]
-			// );
-			// }
-
-			$order_total_summed_by_items += round( (float) $shipping_total, 2 ) + round( (float) $fee_amount, 2 );
-
-			if ( $order_total !== $order_total_summed_by_items && ( abs( $order_total - $order_total_summed_by_items ) < 2 ) ) {
-				// 如果金額不符合，且差距在 2 元內，就是把 $order_total 改為 $order_total_summed_by_items
-				$order_total = $order_total_summed_by_items;
-			}
+			// 組合發票明細（明細加總必須等於 SalesAmount）
+			$invoice_items                = $this->build_invoice_items( $order );
+			$ecpay_invoice->Send['Items'] = $invoice_items['items'];
 
 			// 自訂編號必須唯一：時間(秒) + 訂單編號 + 亂數，避免同一秒批次開立時撞號。
 			$relateNumber = date( 'YmdHis' ) . $order_id . wp_rand( 10, 99 );
@@ -224,7 +117,7 @@ class EcpayInvoiceHandler {
 			$ecpay_invoice->Send['CarruerType']        = $carruerType;
 			$ecpay_invoice->Send['CarruerNum']         = $carruerNum;
 			$ecpay_invoice->Send['TaxType']            = 1;
-			$ecpay_invoice->Send['SalesAmount']        = round( (float) $order_total );
+			$ecpay_invoice->Send['SalesAmount']        = round( (float) $invoice_items['sales_amount'] );
 			$ecpay_invoice->Send['InvoiceRemark']      = $invoiceRemark;
 			$ecpay_invoice->Send['InvType']            = '07';
 			$ecpay_invoice->Send['vat']                = '';
@@ -389,6 +282,93 @@ class EcpayInvoiceHandler {
 		} else {
 			return __( 'Invalid Ecpay invoice error!', 'woomp' );
 		}
+	}
+
+	/**
+	 * 組合發票商品明細與發票總金額
+	 *
+	 * 綠界要求明細加總等於 SalesAmount，否則回 RtnCode 1200031。
+	 * 商品、運費、費用一律列「含稅」金額；折扣行不自行重算稅額，
+	 * 而是用「訂單總額 − 已列出的明細」的差額，涵蓋折價券、後台手改金額等情境（issue #137）。
+	 *
+	 * @param \WC_Order $order 訂單.
+	 * @return array{items: array<int, array<string, mixed>>, sales_amount: float}
+	 */
+	public function build_invoice_items( \WC_Order $order ): array {
+		$invoice_items = [];
+		$items_total   = 0.0;
+
+		// 商品（折扣前的含稅小計）
+		foreach ( $order->get_items() as $item ) {
+			$item_amount     = round( (float) $item->get_subtotal() + (float) $item->get_subtotal_tax(), 2 );
+			$item_count      = $item->get_quantity();
+			$invoice_items[] = [
+				'ItemName'    => wp_strip_all_tags( str_replace( '|', '-', $item->get_name() ), true ),
+				'ItemCount'   => $item_count,
+				'ItemWord'    => '批',
+				'ItemPrice'   => round( $item_amount / (float) $item_count, 2 ),
+				'ItemTaxType' => 1,
+				'ItemAmount'  => $item_amount,
+			];
+			$items_total    += $item_amount;
+		}
+
+		// 運費（含稅）
+		$shipping_total = round( round( (float) $order->get_shipping_total() + (float) $order->get_shipping_tax(), wc_get_price_decimals() ), 2 );
+		if ( 0.0 !== $shipping_total ) {
+			$invoice_items[] = [
+				'ItemName'    => '運費',
+				'ItemCount'   => 1,
+				'ItemWord'    => '式',
+				'ItemPrice'   => $shipping_total,
+				'ItemTaxType' => 1,
+				'ItemAmount'  => $shipping_total,
+			];
+			$items_total    += $shipping_total;
+		}
+
+		// 費用（含稅）
+		$fee_amount = 0.0;
+		foreach ( $order->get_fees() as $fee ) {
+			$fee_amount += (float) $fee->get_total() + (float) $fee->get_total_tax();
+		}
+		$fee_amount = round( $fee_amount, 2 );
+		if ( 0.0 !== $fee_amount ) {
+			$invoice_items[] = [
+				'ItemName'    => '費用',
+				'ItemCount'   => 1,
+				'ItemWord'    => '式',
+				'ItemPrice'   => $fee_amount,
+				'ItemTaxType' => 1,
+				'ItemAmount'  => $fee_amount,
+			];
+			$items_total    += $fee_amount;
+		}
+
+		// 折扣：訂單總額低於已列明細時，以差額補一行（折價券、後台手改金額都歸在這裡）
+		$order_total = (float) $order->get_total();
+		$diff_price  = round( $order_total - $items_total, 2 );
+		if ( $diff_price < 0 ) {
+			$invoice_items[] = [
+				'ItemName'    => '折扣',
+				'ItemCount'   => 1,
+				'ItemWord'    => '式',
+				'ItemPrice'   => $diff_price,
+				'ItemTaxType' => 1,
+				'ItemAmount'  => $diff_price,
+			];
+			$items_total    += $diff_price;
+		}
+
+		// 差距在 2 元內（四捨五入誤差）就以明細加總為準，確保兩者一致
+		if ( abs( $order_total - $items_total ) < 2 ) {
+			$order_total = $items_total;
+		}
+
+		return [
+			'items'        => $invoice_items,
+			'sales_amount' => $order_total,
+		];
 	}
 
 	/**
