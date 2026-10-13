@@ -1845,3 +1845,9 @@ msgstr "設定"
 #: woocommerce/shipping/ecpay/includes/ecpay-shipping-api.php:168
 msgid "This order already has a shipping code. A new cash on delivery shipping code is being created, please confirm the collection amount is not duplicated."
 msgstr "此訂單已有物流單，本次再次建立代收貨款物流單，請確認代收金額是否重複。"
+
+#. translators: %s: payment method id
+#: woocommerce/shipping/ecpay/includes/ecpay-shipping-api.php:172
+#, php-format
+msgid "Payment method \"%s\" looks like cash on delivery but is not in the ry_ecpay_cod_gateway_ids list, so the shipping code is created WITHOUT collection. Please check the ECPay shipping order."
+msgstr "付款方式「%s」看起來是貨到付款，但不在 ry_ecpay_cod_gateway_ids 清單內，因此本次建立的是「純配送」物流單（未代收貨款），請至綠界後台確認。"

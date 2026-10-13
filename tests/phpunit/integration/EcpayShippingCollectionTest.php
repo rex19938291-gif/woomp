@@ -395,4 +395,106 @@ class EcpayShippingCollectionTest extends WP_UnitTestCase {
 
 		$this->assertNotEmpty( $matched, '已有物流單又建立代收單時應寫入提醒商家的訂單備註' );
 	}
+
+	// ------------------------------------------------------------------
+	// 案例 7～10：issue #135 —— woomp 自家貨到付款與自訂 COD 金流
+	// ------------------------------------------------------------------
+
+	/**
+	 * @testdox 案例7（issue #135）：woomp 自家貨到付款（woomp_cod_gateway）第一次建單應代收貨款
+	 */
+	public function test_case_a7_woomp_cod_gateway_order_forces_collection() {
+		$order = $this->create_order_with_shipping_item( 'ry_ecpay_shipping_cvs_family', 1262, 'woomp_cod_gateway' );
+
+		RY_ECPay_Shipping_Api::get_code( $order->get_id(), false );
+
+		$this->assertCount( 1, $this->sent_requests );
+
+		$sent = $this->sent_requests[0]['body'];
+		$this->assertSame( 'Y', $sent['IsCollection'], 'issue #135：woomp_cod_gateway 訂單應代收貨款，不可送出純配送' );
+		$this->assertSame( '1262', $sent['CollectionAmount'] );
+	}
+
+	/**
+	 * @testdox 案例8（issue #135）：透過 ry_ecpay_cod_gateway_ids filter 加入的自訂 COD 金流應代收貨款
+	 */
+	public function test_case_a8_custom_cod_gateway_via_filter_forces_collection() {
+		$add_custom_cod = static function ( $ids ) {
+			$ids[] = 'my_custom_cod';
+			return $ids;
+		};
+		add_filter( 'ry_ecpay_cod_gateway_ids', $add_custom_cod );
+
+		$order = $this->create_order_with_shipping_item( 'ry_ecpay_shipping_cvs_711', 700, 'my_custom_cod' );
+
+		RY_ECPay_Shipping_Api::get_code( $order->get_id(), false );
+
+		remove_filter( 'ry_ecpay_cod_gateway_ids', $add_custom_cod );
+
+		$this->assertCount( 1, $this->sent_requests );
+		$this->assertSame( 'Y', $this->sent_requests[0]['body']['IsCollection'] );
+		$this->assertSame( '700', $this->sent_requests[0]['body']['CollectionAmount'] );
+	}
+
+	/**
+	 * @testdox 案例9（issue #135）：付款方式名稱像貨到付款、但不在 COD 清單時，送出純配送並留下警告備註
+	 */
+	public function test_case_a9_cod_like_title_without_known_gateway_adds_warning_note() {
+		$order = $this->create_order_with_shipping_item( 'ry_ecpay_shipping_cvs_711', 500, 'unknown_cod_clone' );
+		$order->set_payment_method_title( '超商貨到付款' );
+		$order->save();
+
+		RY_ECPay_Shipping_Api::get_code( $order->get_id(), false );
+
+		$this->assertSame( 'N', $this->sent_requests[0]['body']['IsCollection'], '未知金流不應被猜測為代收' );
+
+		$note_contents = wp_list_pluck( wc_get_order_notes( [ 'order_id' => $order->get_id() ] ), 'content' );
+		$matched       = array_filter(
+			$note_contents,
+			static function ( $content ) {
+				return false !== strpos( $content, 'ry_ecpay_cod_gateway_ids' );
+			}
+		);
+		$this->assertNotEmpty( $matched, '付款方式看起來是貨到付款卻送出純配送時，應寫入警告備註提醒商家' );
+	}
+
+	/**
+	 * @testdox 案例10（issue #135）：一般付款方式送出純配送時，不應寫入貨到付款警告備註
+	 */
+	public function test_case_a10_normal_gateway_has_no_cod_warning_note() {
+		$order = $this->create_order_with_shipping_item( 'ry_ecpay_shipping_cvs_711', 600, 'bacs' );
+		$order->set_payment_method_title( '銀行轉帳' );
+		$order->save();
+
+		RY_ECPay_Shipping_Api::get_code( $order->get_id(), false );
+
+		$note_contents = wp_list_pluck( wc_get_order_notes( [ 'order_id' => $order->get_id() ] ), 'content' );
+		$matched       = array_filter(
+			$note_contents,
+			static function ( $content ) {
+				return false !== strpos( $content, 'ry_ecpay_cod_gateway_ids' );
+			}
+		);
+		$this->assertEmpty( $matched );
+	}
+
+	/**
+	 * @testdox 案例11（issue #135）：woomp_cod_gateway 訂單的後台訂單動作應出現「代收貨款」建單選項
+	 */
+	public function test_case_a11_admin_order_actions_offer_cod_action_for_woomp_cod_gateway() {
+		// admin 類別只在 is_admin() 時載入，測試環境需手動引入（檔尾會呼叫 init() 註冊後台 hook，不影響本案例）。
+		if ( ! class_exists( 'RY_ECPay_Shipping_Admin' ) ) {
+			include_once RY_WT_PLUGIN_DIR . 'woocommerce/shipping/ecpay/includes/ecpay-shipping-admin.php';
+		}
+
+		global $theorder;
+		$previous = $theorder;
+		$theorder = $this->create_order_with_shipping_item( 'ry_ecpay_shipping_cvs_711', 800, 'woomp_cod_gateway' );
+
+		$actions = RY_ECPay_Shipping_Admin::add_order_actions( [] );
+
+		$theorder = $previous;
+
+		$this->assertArrayHasKey( 'get_new_ecpay_no_cod', $actions );
+	}
 }

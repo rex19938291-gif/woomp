@@ -193,7 +193,7 @@ final class RY_ECPay_Shipping_admin {
 		foreach ( $theorder->get_items( 'shipping' ) as $item_id => $item ) {
 			if ( RY_ECPay_Shipping::get_order_support_shipping( $item ) !== false ) {
 				$order_actions['get_new_ecpay_no'] = __( 'Get new Ecpay shipping no', 'ry-woocommerce-tools' );
-				if ( $theorder->get_payment_method() == 'cod' ) {
+				if ( RY_ECPay_Shipping::is_cod_order( $theorder ) ) {
 					$order_actions['get_new_ecpay_no_cod'] = __( 'Get new Ecpay shipping no with cod', 'ry-woocommerce-tools' );
 				}
 				if ( $theorder->has_status( [ 'ry-at-cvs' ] ) ) {

@@ -159,9 +159,20 @@ class RY_ECPay_Shipping_Api extends RY_ECPay {
 
 			// 貨到付款一律代收；$collection 為後台「代收貨款」動作的額外強制。
 			// 兩者皆不受「是否為第一張物流單」影響，避免改單後重建物流單時靜默變成純配送。
-			if (true === $collection || 'cod' === $order->get_payment_method()) {
+			// 貨到付款清單含 woomp 自家的 woomp_cod_gateway（issue #135），可用 ry_ecpay_cod_gateway_ids 擴充。
+			if (true === $collection || RY_ECPay_Shipping::is_cod_order($order)) {
 				$args['IsCollection']     = 'Y';
 				$args['CollectionAmount'] = (int) $total;
+			} elseif (preg_match('/貨到付款|取貨付款/u', (string) $order->get_payment_method_title())) {
+				// 付款方式名稱像貨到付款、卻不在清單內（多半是各站自訂的 COD 複製版），
+				// 不擅自代收，但留下備註避免再次靜默送出純配送。
+				$order->add_order_note(
+					sprintf(
+						/* translators: %s: payment method id */
+						__('Payment method "%s" looks like cash on delivery but is not in the ry_ecpay_cod_gateway_ids list, so the shipping code is created WITHOUT collection. Please check the ECPay shipping order.', 'ry-woocommerce-tools'),
+						$order->get_payment_method()
+					)
+				);
 			}
 
 			// 已有物流單又再建一張代收單，提醒商家確認是否重複代收。
