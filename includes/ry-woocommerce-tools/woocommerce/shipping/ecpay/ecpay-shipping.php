@@ -447,6 +447,29 @@ final class RY_ECPay_Shipping {
 		return $found_method;
 	}
 
+	/**
+	 * 取得視為「貨到付款」的金流 ID 清單
+	 *
+	 * 除了 WooCommerce 內建的 `cod`，woomp 另有自家複製的貨到付款金流
+	 * `woomp_cod_gateway`（issue #135）。各站自訂的 COD 複製版可透過
+	 * `ry_ecpay_cod_gateway_ids` filter 加入。
+	 *
+	 * @return string[]
+	 */
+	public static function get_cod_gateway_ids(): array {
+		return (array) apply_filters( 'ry_ecpay_cod_gateway_ids', [ 'cod', 'woomp_cod_gateway' ] );
+	}
+
+	/**
+	 * 訂單是否為貨到付款（建物流單時須代收貨款）
+	 *
+	 * @param WC_Order $order 訂單。
+	 * @return bool
+	 */
+	public static function is_cod_order( $order ): bool {
+		return in_array( $order->get_payment_method(), self::get_cod_gateway_ids(), true );
+	}
+
 	public static function get_code( $order_id, $order ) {
 		$shipping_list = $order->get_meta( '_ecpay_shipping_info', true );
 		if ( ! is_array( $shipping_list ) ) {

@@ -1617,3 +1617,9 @@ msgstr ""
 #: woocommerce/shipping/ecpay/includes/ecpay-shipping-api.php:168
 msgid "This order already has a shipping code. A new cash on delivery shipping code is being created, please confirm the collection amount is not duplicated."
 msgstr ""
+
+#. translators: %s: payment method id
+#: woocommerce/shipping/ecpay/includes/ecpay-shipping-api.php:172
+#, php-format
+msgid "Payment method \"%s\" looks like cash on delivery but is not in the ry_ecpay_cod_gateway_ids list, so the shipping code is created WITHOUT collection. Please check the ECPay shipping order."
+msgstr ""
