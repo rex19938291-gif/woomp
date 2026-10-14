@@ -456,7 +456,10 @@ final class Request {
 
 		$order->save();
 
-		Payment::log( $args );
+		// Keep card fields out of the debug log; the payment arguments stay unchanged.
+		$log_args = $args;
+		unset( $log_args['CardNo'], $log_args['CardExpired'], $log_args['CardCVC'] );
+		Payment::log( $log_args );
 
 		$parameter = [
 			'MerID'       => $this->gateway->get_mer_id(),

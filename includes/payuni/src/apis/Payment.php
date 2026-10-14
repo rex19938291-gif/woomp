@@ -103,10 +103,58 @@ class Payment {
             if( empty( self::$log ) ) {
                 self::$log = new \WC_Logger();
             }
-            self::$log->log( $level, wc_print_r( $message, true ), [ 'source' => 'payuni_payment' ] );
+            self::$log->log( $level, self::mask_log_message( wc_print_r( self::mask_log_message( $message ), true ) ), [ 'source' => 'payuni_payment' ] );
         }
     }
     
+    /** Mask one sensitive field without retaining the original value. */
+    private static function mask_log_field( $key, $value ) {
+        if ( strtolower( $key ) !== 'cardno' || ! is_scalar( $value ) ) {
+            return '[已遮罩]';
+        }
+        $digits = preg_replace( '/\D/', '', (string) $value );
+        return '[已遮罩]' . ( strlen( $digits ) >= 4 ? '****' . substr( $digits, -4 ) : '' );
+    }
+
+    /** Mask nested arrays, JSON and wc_print_r text. No logging or network calls. */
+    private static function mask_log_message( $message ) {
+        $keys = [ 'cardno', 'cardcvc', 'cardexpired', 'credithash', 'encryptinfo' ];
+        if ( is_array( $message ) ) {
+            foreach ( $message as $key => $value ) {
+                $message[ $key ] = in_array( strtolower( (string) $key ), $keys, true )
+                    ? self::mask_log_field( $key, $value ) : self::mask_log_message( $value );
+            }
+            return $message;
+        }
+        if ( ! is_string( $message ) ) {
+            return $message;
+        }
+        $decoded = json_decode( $message, true );
+        if ( JSON_ERROR_NONE === json_last_error() && is_array( $decoded ) ) {
+            $encoded = json_encode( self::mask_log_message( $decoded ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+            return false === $encoded ? '[已遮罩]' : $encoded;
+        }
+        $message = preg_replace_callback(
+            '~("(CardNo|CardCVC|CardExpired|CreditHash|EncryptInfo)"\s*:\s*)("(?:\\\\.|[^"\\\\])*"|[^,}\]\r\n]+)~i',
+            function ( $match ) {
+                $value = json_decode( $match[3], true );
+                return $match[1] . json_encode( self::mask_log_field( $match[2], $value ), JSON_UNESCAPED_UNICODE );
+            },
+            $message
+        );
+        if ( null === $message ) {
+            return '[已遮罩]';
+        }
+        $masked = preg_replace_callback(
+            '~(\[(CardNo|CardCVC|CardExpired|CreditHash|EncryptInfo)\][ \t]*=>[ \t]*)([^\r\n]*(?:\r?\n(?![ \t]*(?:\[[^\]\r\n]+\][ \t]*=>|\)))[^\r\n]+)*)~i',
+            function ( $match ) {
+                return $match[1] . self::mask_log_field( $match[2], $match[3] );
+            },
+            $message
+        );
+        return null === $masked ? '[已遮罩]' : $masked;
+    }
+
     /**
      * PAYUNi encrypt
      */
