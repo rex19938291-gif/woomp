@@ -16,6 +16,8 @@ defined( 'ABSPATH' ) || exit;
  */
 class CreditInstallment extends AbstractGateway {
 
+	/** @var array|string 可選分期期數 */
+	public $number_of_periods;
 
 	/**
 	 * Constructor

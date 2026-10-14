@@ -18,6 +18,12 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class WOOMP_PayNow_Shipping_HD_TCat_Refrigerated extends PayNow_Abstract_Shipping_Method {
 
+	/** @var string 免運條件 */
+	public $free_shipping_requires;
+
+	/** @var int|string 免運最低金額 */
+	public $free_shipping_min_amount;
+
 	/**
 	 * The constructor.
 	 *

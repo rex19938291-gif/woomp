@@ -36,6 +36,9 @@ class WC_Gateway_LINEPay_Handler {
 	 */
 	private static $logger;
 
+	/** @var array|false LINE Pay 閘道設定（woocommerce_linepay_settings 選項值） */
+	public $linepay_settings;
+
 	/**
 	 * Constructor function
 	 */

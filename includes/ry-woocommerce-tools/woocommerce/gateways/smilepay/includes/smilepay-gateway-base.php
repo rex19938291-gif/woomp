@@ -4,6 +4,12 @@ class RY_SmilePay_Gateway_Base extends WC_Payment_Gateway {
 	public static $log_enabled = false;
 	public static $log         = false;
 
+	/** @var int|string 最低訂單金額（各子類別建構時由設定載入） */
+	public $min_amount;
+
+	/** @var int|string 繳費期限（ATM 為天數、超商代碼為分鐘數，僅 ATM／超商代碼／超商條碼使用） */
+	public $expire_date;
+
 	public $get_code_mode = false;
 
 	public function __construct() {

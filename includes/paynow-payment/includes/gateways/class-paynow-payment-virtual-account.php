@@ -12,6 +12,9 @@ defined( 'ABSPATH' ) || exit;
  */
 class PayNow_Payment_Virtual_Account extends PayNow_Abstract_Payment_Gateway {
 
+	/** @var string 付款結果通知網址（wc-api） */
+	public $order_result_url;
+
 	/**
 	 * Constructor
 	 */

@@ -95,7 +95,13 @@ if( class_exists( 'WC_Payment_Gateway' ) ) {
          * @var string
          */
         protected $api_endpoint_url;
-        
+
+        /** @var int 最低訂單金額 */
+        public $min_amount;
+
+        /** @var string 退款（交易請退款）API 路徑 */
+        public $api_refund_url;
+
         /**
          * Payment orgno
          *

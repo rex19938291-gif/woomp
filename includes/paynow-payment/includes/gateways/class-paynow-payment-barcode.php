@@ -12,6 +12,12 @@ defined( 'ABSPATH' ) || exit;
  */
 class PayNow_Payment_Barcode extends PayNow_Abstract_Payment_Gateway {
 
+	/** @var string 超商條碼繳費單網址（後接 BNO） */
+	public $barcode_url;
+
+	/** @var string 付款結果通知網址（wc-api） */
+	public $order_result_url;
+
 	/**
 	 * Constructor
 	 */

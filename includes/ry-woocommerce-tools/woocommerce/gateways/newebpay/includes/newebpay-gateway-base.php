@@ -4,6 +4,15 @@ class RY_NewebPay_Gateway_Base extends WC_Payment_Gateway {
 	public static $log_enabled = false;
 	public static $log         = false;
 
+	/** @var int|string 最低訂單金額（各子類別建構時由設定載入） */
+	public $min_amount;
+
+	/** @var int|string 繳費期限天數（僅 ATM／超商代碼／超商條碼使用） */
+	public $expire_date;
+
+	/** @var array|string 信用卡分期期數（僅分期閘道使用；未設定時維持 null，isset() 判斷不變） */
+	public $number_of_periods;
+
 	public function __construct() {
 		add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, [ $this, 'process_admin_options' ] );
 

@@ -39,6 +39,27 @@ abstract class PayNow_Abstract_Shipping_Method extends WC_Shipping_Method {
 	 */
 	public $max_amount;
 
+	/** @var string 運費（可含 [qty]、[fee] 等運算式） */
+	public $cost;
+
+	/** @var string 免運條件（coupon／min_amount／either／both） */
+	public $requires;
+
+	/** @var int|string 免運最低金額 */
+	public $min_amount;
+
+	/** @var int|string 每單位重量加收運費 */
+	public $weight_plus_cost;
+
+	/** @var string 計算免運金額時是否忽略折扣（yes／no） */
+	public $ignore_discounts;
+
+	/** @var string 運費類別計算方式（class／order） */
+	public $type;
+
+	/** @var string|float evaluate_cost() 計算 [fee] 短代碼用的基準金額 */
+	public $fee_cost;
+
 	public function init() {
 		$this->instance_form_fields['title']['default'] = $this->method_title;
 		$this->instance_form_fields['cost']['default']  = 65;

@@ -14,6 +14,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class WOOMP_PayNow_Shipping_C2C_Family_Frozen extends PayNow_Abstract_Shipping_Method {
 
+	/** @var string 包裹材積尺寸（例如 s60） */
+	public $measurement;
+
 	/**
 	 * Constructor
 	 *
