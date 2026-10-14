@@ -363,6 +363,14 @@ class CreditV3 extends AbstractGateway
 			// 解密 PayUni 回應（server-side API 一定有 EncryptInfo）
 			$trade_result = $handler->process_notify($raw_response);
 
+			// issue #141：PayUni 以錯誤狀態碼拒絕交易時（如 IFTRADE02011），回應同樣沒有 TradeNo，
+			// 不可落入下方「3D 驗證已建立」分支，否則會回傳 success 把顧客導向訂單完成頁。
+			// 3D 建立成功的回應是 Status=SUCCESS 並帶 URL，故以「非 SUCCESS 且無 3D 導向網址」判定遭拒
+			// （與 CreditSubscriptionV3::process_positive_amount() 的判斷一致）。
+			if ('SUCCESS' !== ($trade_result['Status'] ?? '') && empty($trade_result['URL'])) {
+				return $this->handle_declined_trade($order, $handler, $trade_result);
+			}
+
 			// 判斷是否為 3D 驗證流程：解密後 TradeNo 為空 = 僅建立 3D 驗證，尚未實際授權
 			// 真正的交易完成會有 TradeNo（由 webhook 回傳）
 			if (! empty($trade_result['TradeNo'])) {
@@ -416,6 +424,54 @@ class CreditV3 extends AbstractGateway
 				'result' => 'failure',
 			];
 		}
+	}
+
+	/**
+	 * 處理 PayUni 拒絕的交易（Status 非 SUCCESS）
+	 *
+	 * 訂單維持「等待付款中」讓顧客重試，如實寫入「交易遭拒」備註，
+	 * 並以結帳錯誤訊息告知顧客，回傳 failure 避免導向訂單完成頁。
+	 *
+	 * @param \WC_Order    $order        訂單物件
+	 * @param TradeHandler $handler      交易處理器
+	 * @param array        $trade_result 解密後的交易結果
+	 *
+	 * @return array{result:string}
+	 */
+	private function handle_declined_trade(\WC_Order $order, TradeHandler $handler, array $trade_result): array
+	{
+		$status  = $trade_result['Status'] ?? '';
+		$message = $trade_result['Message'] ?? '';
+
+		if (! empty($trade_result['TradeNo'])) {
+			// 已產生交易編號的授權失敗：交給 update_order_status() 寫入失敗備註與交易 meta
+			$handler->update_order_status($order, $trade_result);
+		} else {
+			$order->update_meta_data('_payuni_v3_resp', $trade_result);
+			$order->add_order_note(
+				\sprintf(
+					'統一金流交易遭拒（狀態碼：%s，交易訊息：%s）',
+					$status,
+					$message
+				)
+			);
+			$order->save();
+		}
+
+		\do_action('woomp_payuni_log', 'error', "#{$order->get_id()} 交易遭拒", [
+			'order_id' => $order->get_id(),
+			'status'   => $status,
+			'message'  => $message,
+		]);
+
+		\wc_add_notice(
+			\esc_html(\sprintf('付款失敗：%s', '' !== $message ? $message : $status)),
+			'error'
+		);
+
+		return [
+			'result' => 'failure',
+		];
 	}
 
 	/**
