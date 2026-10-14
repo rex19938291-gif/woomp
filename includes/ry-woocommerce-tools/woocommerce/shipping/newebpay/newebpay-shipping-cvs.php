@@ -6,6 +6,27 @@ require_once RY_WT_PLUGIN_DIR . 'woocommerce/gateways/newebpay/newebpay-gateway.
 
 class RY_NewebPay_Shipping_CVS extends WC_Shipping_Method {
 
+	/** @var string 運費（可含 [qty]、[fee] 等運算式） */
+	public $cost;
+
+	/** @var string 免運條件（coupon／min_amount／either／both） */
+	public $requires;
+
+	/** @var int|string 免運最低金額 */
+	public $min_amount;
+
+	/** @var string 計算免運金額時是否忽略折扣（yes／no） */
+	public $ignore_discounts;
+
+	/** @var int|string 每單位重量加收運費 */
+	public $weight_plus_cost;
+
+	/** @var string 運費類別計算方式（class／order） */
+	public $type;
+
+	/** @var string|float evaluate_cost() 計算 [fee] 短代碼用的基準金額 */
+	public $fee_cost;
+
 	public function __construct( $instance_id = 0 ) {
 		$this->id                 = 'ry_newebpay_shipping_cvs';
 		$this->instance_id        = absint( $instance_id );

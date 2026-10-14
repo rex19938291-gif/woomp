@@ -19,6 +19,15 @@ add_action( 'plugins_loaded', 'init_woomp_gateway_cvs', 11 );
 function init_woomp_gateway_cvs() {
 	class WooMP_Payment_CVS extends WC_Payment_Gateway {
 
+		/** @var array 限定可使用此付款方式的運送方式 */
+		public $enable_for_methods;
+
+		/** @var bool 虛擬商品訂單是否可使用此付款方式 */
+		public $enable_for_virtual;
+
+		/** @var string 感謝頁／Email 顯示的付款說明 */
+		public $instructions;
+
 		/**
 		 * Constructor for the gateway.
 		 */

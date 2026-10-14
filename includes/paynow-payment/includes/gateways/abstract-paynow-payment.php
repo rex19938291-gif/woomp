@@ -68,6 +68,9 @@ abstract class PayNow_Abstract_Payment_Gateway extends WC_Payment_Gateway {
 	 */
 	protected $api_url;
 
+	/** @var int 最低訂單金額 */
+	public $min_amount;
+
 	/**
 	 * Constructor
 	 */

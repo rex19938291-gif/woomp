@@ -17,7 +17,46 @@ class WC_Gateway_LINEPay extends WC_Payment_Gateway {
      * @var WC_Gateway_LINEpay_Logger
      */
     private static $logger;
-    
+
+    /** @var array 各幣別的小數位數 */
+    public $linepay_currency_scales;
+
+    /** @var string[] LINE Pay 支援的幣別 */
+    public $linepay_supported_currencies;
+
+    /** @var array 管理員／顧客可退款的訂單狀態 */
+    public $linepay_supported_order_statuses;
+
+    /** @var bool 是否啟用沙盒模式 */
+    public $enable_sandbox;
+
+    /** @var string 目前環境（real／sandbox） */
+    public $linepay_evn_status;
+
+    /** @var string 付款類型 */
+    public $linepay_payment_type;
+
+    /** @var string 付款動作（授權／請款） */
+    public $linepay_payment_action;
+
+    /** @var bool 是否啟用 LINE Pay 運送資訊 */
+    public $linepay_shipping_enabled;
+
+    /** @var array 日誌設定（enabled、level） */
+    public $linepay_log_info;
+
+    /** @var array 各環境的 Channel ID／Secret */
+    public $linepay_channel_info;
+
+    /** @var array 管理員／顧客可退款狀態設定 */
+    public $linepay_refundable_statuses;
+
+    /** @var bool|WP_Error 閘道是否可用（不可用時為 WP_Error） */
+    public $linepay_is_valid;
+
+    /** @var string LINE Pay 標誌圖片網址 */
+    public $linepay_logo;
+
     
     /**
      * LINEPay Gateway
